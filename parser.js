@@ -1,9 +1,12 @@
 const { Document } = require('tree-sitter');
 const { readFileSync } = require('fs');
+const util = require('util');
+const fs = require('fs');
+
+const emacsStream = fs.createWriteStream('syntax.el');
 
 const document = new Document();
 document.setLanguage(require('tree-sitter-javascript'));
-
 
 const f = 'example.js';
 
@@ -22,9 +25,10 @@ const output = {
 function loop(parent, node) {
   const { type, startIndex, endIndex, isNamed } = node;
 
-  // if (type === 'identifier') {
-  // const identifier = content.substring(startIndex, endIndex);
-  // }
+  if (type === 'program') {
+    emacsStream.write(`(setq index-tree '(`);
+  }
+  emacsStream.write(`((${startIndex} . ${endIndex}) "${type}" `);
 
   if (type === 'return' ||
       type === 'const' ||
@@ -50,10 +54,17 @@ function loop(parent, node) {
     // console.log(node);
   }
 
-  if (node.children) {
-    node.children.forEach((child) => loop(node, child));
+  if (node.children.length > 0) {
+    emacsStream.write(" \n (children ");
+    node.children.forEach((child) => {
+      emacsStream.write('\n');
+      loop(node, child);
+    });
+    emacsStream.write(')');
   }
+  emacsStream.write(')');
 }
+
 
 function generateEmacsProgram(output) {
   const setColor = (color, startIndex, endIndex) => {
@@ -80,4 +91,7 @@ function generateEmacsProgram(output) {
 
 
 loop(null, document.rootNode);
+emacsStream.write('))');
 generateEmacsProgram(output);
+
+emacsStream.end();
